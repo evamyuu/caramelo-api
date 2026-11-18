@@ -55,7 +55,7 @@ async def test_secure_session_asks_consent_and_never_types_the_password(base_url
                 consents += 1
                 await ws.send(json.dumps({"type": "consent", "approved": True}))
             elif message["type"] == "handover":  # the "user" types her own password
-                for key in ({"special": "Tab"}, {"text": "1234"}, {"special": "Enter"}):
+                for key in ({"text": "1234"}, {"special": "Enter"}):  # field is auto-focused
                     await ws.send(json.dumps({"type": "key", **key}))
                 await asyncio.sleep(1.5)
                 await ws.send(json.dumps({"type": "ready"}))
