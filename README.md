@@ -1,116 +1,186 @@
-![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
-![Playwright](https://img.shields.io/badge/Playwright-Chromium-2EAD33?logo=playwright&logoColor=white)
-![MongoDB Atlas](https://img.shields.io/badge/MongoDB-Atlas-47A248?logo=mongodb&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green)
+# 🐕 Caramelo API – Guardião Digital da Pessoa Idosa
 
-<!-- Banner: add docs/banner.png and uncomment -->
-<!-- ![Caramelo](docs/banner.png) -->
+> *"O cão de guarda que mora no celular da vó"*
 
-# 🐕 Caramelo API
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Playwright](https://img.shields.io/badge/Playwright-Chromium-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/python)
+[![MongoDB Atlas](https://img.shields.io/badge/MongoDB-Atlas-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/atlas)
+[![FIAP](https://img.shields.io/badge/FIAP-Global%20Solution%202026-red)](.)
 
-> The guard dog that lives in grandma's phone. This is where Caramelo opens suspicious links far from her device and does online chores together with her, asking permission first.
+<!-- Banner: adicione docs/assets/banner-github.png e descomente
+<p align="center">
+  <br />
+  <img src="docs/assets/banner-github.png" alt="Banner Caramelo" width="1000"/>
+  <br />
+</p>
+-->
 
-Backend of **Caramelo**, an assistant that protects and helps older adults in Brazil. Built for the FIAP Global Solution 2026 (CitizenTech). The client lives in [`caramelo-app`](https://github.com/evamyuu/caramelo-app).
+## 🐾 Sobre o Projeto
 
-## 📖 About
+O **Caramelo** é um assistente que protege e ajuda pessoas idosas no Brasil. Esta é a sua **API**: é aqui que o Caramelo abre links suspeitos longe do celular da vó e faz tarefas online junto com ela, **sempre pedindo permissão antes**. Projeto desenvolvido para a **FIAP Global Solution 2026 (CitizenTech)**. O cliente fica em [`caramelo-app`](https://github.com/evamyuu/caramelo-app).
 
-| Capability | Status | Endpoint |
+| Funcionalidade | Status | Endpoint |
 | --- | --- | --- |
-| Isolated link scan (disposable headless browser, explainable score) | Real | `POST /api/v1/links/scan` |
-| Secure co-browsing with consent gate and credential handover | Real | `WS /api/v1/secure-session` |
-| Call risk score (weighted, explainable signals) | Real scoring, simulated call | `POST /api/v1/calls/assess` |
-| Anonymous scam insights (MongoDB aggregation) | Real | `GET /api/v1/insights/summary` |
-| Assistant chat | Real when an LLM key is set | `POST /api/v1/assistant/chat` |
-| Carrier SIM Swap (CAMARA) and Open Finance balance | Stubs in the real payload shape | `GET /api/v1/accounts/balance` |
+| Análise isolada de links (navegador headless descartável, score explicável) | Real | `POST /api/v1/links/scan` |
+| Navegação assistida com consentimento e entrega da senha para a pessoa | Real | `WS /api/v1/secure-session` |
+| Score de risco de ligações (sinais ponderados e explicáveis) | Score real, ligação simulada | `POST /api/v1/calls/assess` |
+| Insights anônimos de golpes (agregação no MongoDB) | Real | `GET /api/v1/insights/summary` |
+| Chat com o assistente | Real quando há chave de LLM | `POST /api/v1/assistant/chat` |
+| SIM Swap da operadora (CAMARA) e saldo via Open Finance | Stubs no formato real do payload | `GET /api/v1/accounts/balance` |
 
-Interactive docs: `http://localhost:8000/docs`.
-
-## 🏗️ Architecture
-
-```
-app/
-├── main.py            Application factory and lifespan (composition root)
-├── config.py          Settings from environment variables
-├── api/               HTTP/WebSocket layer
-│   ├── router.py        API v1 aggregation
-│   ├── routers/         One router per module: guard, companion, insights, secure_session, system
-│   ├── dependencies.py  Dependency injection (repositories)
-│   └── schemas.py       Request models
-├── services/          Business rules: risk scoring, link scanner, secure session
-├── ai/                AI layer
-│   ├── client.py        Model-agnostic entry point with deterministic fallback
-│   ├── prompts.py       Every prompt, in one reviewed place
-│   └── providers/       Strategy per vendor: Anthropic, Gemini
-├── db/                Persistence
-│   ├── mongo.py         Atlas client lifecycle
-│   └── repositories/    Repository contract + MongoDB and in-memory implementations
-├── integrations/      Partner APIs (carrier, Open Finance) behind stubs
-└── core/              Browser launcher
-demo_sites/            Fictitious pages used by the demo and e2e tests
-tests/                 Unit and end-to-end tests
-docs/                  Architecture notes
-```
-
-Design decisions:
-
-- **Layered, dependencies point inward.** Routers call services; services depend on protocols (`EventRepository`, `LLMProvider`), never on a vendor.
-- **Open for extension.** A new model vendor is one class in `ai/providers`; a new storage is one repository.
-- **AI never decides safety.** Verdicts, consent and credentials are enforced in code. The model only words explanations and suggests navigation steps, and the service works with no model at all (`rules` mode).
-- **Privacy by design.** Risk events carry no phone number, URL or user id, and expire through a TTL index. Passwords typed during a handover are forwarded to the page and never logged or sent to a model.
-
-More in [`docs/architecture.md`](docs/architecture.md) and [`SECURITY.md`](SECURITY.md).
-
-## 🛠️ Technologies
-
-- **FastAPI + Uvicorn**: async HTTP and WebSocket
-- **Playwright (Chromium)**: disposable browser sessions
-- **MongoDB Atlas (PyMongo Async)**: risk events, `$facet` aggregation, TTL index, Stable API v1
-- **Anthropic / Gemini**: pluggable LLM, optional
-- **Pytest + Ruff**: tests and linting
-- **Docker + GitHub Actions**: container and CI
-
-## 🚀 How to Run
-
-Prerequisites: Python 3.11+.
-
-```bash
-git clone https://github.com/evamyuu/caramelo-api.git
-cd caramelo-api
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-playwright install chromium
-cp .env.example .env
-uvicorn app.main:app --reload
-```
-
-Or with Docker (API + local MongoDB): `docker compose up --build`.
-
-| Variable | Purpose | Default |
-| --- | --- | --- |
-| `GEMINI_API_KEY` | Free-tier LLM | empty (`rules` mode) |
-| `ANTHROPIC_API_KEY` | Takes precedence over Gemini | empty |
-| `MONGODB_URI` | Atlas connection string | empty (in-memory) |
-| `CORS_ORIGINS` | Allowed web origins | `http://localhost:5173` |
-
-Tests and lint: `pytest` and `ruff check .`
-
-## 🤝 How to Contribute
-
-1. Create a branch: `git checkout -b feat/short-description`
-2. Follow [Conventional Commits](https://www.conventionalcommits.org)
-3. Run `ruff check . && pytest` before opening a pull request
-
-## 👥 Team
-
-| [<img src="https://github.com/evamyuu.png" width="80" alt="evamyuu" />](https://github.com/evamyuu) |
-| :---: |
-| [evamyuu](https://github.com/evamyuu) |
-
-## 📄 License
-
-[MIT](LICENSE)
+Documentação interativa: `http://localhost:8000/docs`.
 
 ---
 
-Made with 🤎 by the Caramelo team
+## 🏗️ Arquitetura
+
+O projeto segue uma **arquitetura em camadas com dependências apontando para dentro**: routers chamam serviços, e serviços dependem de contratos (`EventRepository`, `LLMProvider`), nunca de um fornecedor.
+
+```text
+caramelo-api/
+├── app/
+│   ├── main.py                 # Factory da aplicação e lifespan (composition root)
+│   ├── config.py               # Configurações via variáveis de ambiente
+│   ├── api/                    # Camada HTTP/WebSocket
+│   │   ├── router.py           # Agregação da API v1
+│   │   ├── routers/            # Um router por módulo (guard, companion, insights, secure_session, system)
+│   │   ├── dependencies.py     # Injeção de dependências (repositórios)
+│   │   └── schemas.py          # Modelos de requisição
+│   ├── services/               # Regras de negócio: score de risco, scanner de links, sessão segura
+│   ├── ai/                     # Camada de IA
+│   │   ├── client.py           # Ponto de entrada agnóstico de modelo, com fallback determinístico
+│   │   ├── prompts.py          # Todos os prompts, revisados em um só lugar
+│   │   └── providers/          # Strategy por fornecedor: Anthropic, Gemini
+│   ├── db/                     # Persistência
+│   │   ├── mongo.py            # Ciclo de vida do cliente Atlas
+│   │   └── repositories/       # Contrato + implementações MongoDB e em memória
+│   ├── integrations/           # APIs parceiras (operadora, Open Finance) atrás de stubs
+│   └── core/                   # Inicialização do navegador
+│
+├── demo_sites/                 # Páginas fictícias usadas na demo e nos testes e2e
+├── tests/                      # Testes unitários e end-to-end
+└── docs/                       # Notas de arquitetura
+```
+
+### Decisões de Design
+- **Aberto para extensão** - Um novo fornecedor de IA é uma classe em `ai/providers`; um novo armazenamento é um repositório
+- **A IA nunca decide a segurança** - Veredito, consentimento e credenciais são garantidos em código. O modelo só redige explicações e sugere passos de navegação, e o serviço funciona sem modelo nenhum (modo `rules`)
+- **Privacidade desde a concepção** - Eventos de risco não guardam telefone, URL nem id de usuário, e expiram por índice TTL. Senhas digitadas durante a entrega são repassadas à página e nunca registradas em log nem enviadas a um modelo
+
+Mais detalhes em [`docs/architecture.md`](docs/architecture.md) e [`SECURITY.md`](SECURITY.md).
+
+---
+
+## 🚀 Tecnologias Utilizadas
+
+### Core Backend
+- **FastAPI + Uvicorn** - HTTP e WebSocket assíncronos
+- **Playwright (Chromium)** - Sessões de navegador descartáveis e isoladas
+
+### Inteligência Artificial
+- **Anthropic Claude / Google Gemini** - LLM plugável e opcional
+- **Modo `rules`** - Fallback determinístico quando nenhuma chave está configurada
+
+### Dados & Infraestrutura
+- **MongoDB Atlas (PyMongo Async)** - Eventos de risco, agregação `$facet`, índice TTL, Stable API v1
+- **Docker** - Conteinerização e ambiente isolado
+- **GitHub Actions** - Integração contínua
+- **Pytest + Ruff** - Testes e linting
+
+---
+
+## 🛠️ Como Executar
+
+### Pré-requisitos
+- Python (v3.11+)
+- Docker e Docker Compose (opcional)
+
+### Instalação e Execução
+
+1. **Clone o repositório:**
+```bash
+git clone https://github.com/evamyuu/caramelo-api.git
+cd caramelo-api
+```
+
+2. **Crie o ambiente virtual e instale as dependências:**
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+playwright install chromium
+```
+
+3. **Configure as variáveis de ambiente:**
+```bash
+cp .env.example .env
+# Edite o .env para adicionar suas credenciais (Gemini, Anthropic, MongoDB Atlas, etc.)
+```
+
+| Variável | Finalidade | Padrão |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | LLM do plano gratuito | vazio (modo `rules`) |
+| `ANTHROPIC_API_KEY` | Tem prioridade sobre o Gemini | vazio |
+| `MONGODB_URI` | String de conexão do Atlas | vazio (em memória) |
+| `CORS_ORIGINS` | Origens web permitidas | `http://localhost:5173` |
+
+4. **Suba a API:**
+```bash
+uvicorn app.main:app --reload
+```
+
+Ou com Docker (API + MongoDB local):
+```bash
+docker compose up --build
+```
+
+5. **Rode os testes e o lint:**
+```bash
+ruff check . && pytest
+```
+
+---
+
+## 👥 Equipe
+
+Agradecemos às seguintes pessoas que contribuíram para este projeto:
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/evamyuu">
+        <img src="https://avatars.githubusercontent.com/u/109860924?v=4" width="100px;" alt="Evelin Brandão"/><br>
+        <sub><b>evamyuu</b></sub>
+      </a><br/>
+      <sub>Full-Stack · IA + UX/UI</sub>
+    </td>
+    <td align="center">
+      <a href="https://github.com/vncys">
+        <img src="https://avatars.githubusercontent.com/u/98789877?v=4" width="100px;" alt="Vinicyus Oliveira"/><br>
+        <sub><b>donax</b></sub>
+      </a><br/>
+      <sub>Full-Stack · Infra + UX/UI</sub>
+    </td>
+  </tr>
+</table>
+
+---
+
+## 🤝 Como Contribuir
+
+Caramelo é um projeto acadêmico open source. A melhor forma de contribuir é abrindo issues com sugestões ou bugs encontrados.
+
+- **Issues**: Descreva o problema ou sugestão
+- **Pull Requests**: Fork → branch → PR com descrição clara, seguindo [Conventional Commits](https://www.conventionalcommits.org) e rodando `ruff check . && pytest` antes
+
+---
+
+## 📝 Licença
+
+Este projeto está sob licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+
+---
+
+<div>
+  <p>Desenvolvido com 🤎 por Caramelo</p>
+</div>
