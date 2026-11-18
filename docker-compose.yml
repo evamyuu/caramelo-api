@@ -1,0 +1,13 @@
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env
+    environment:
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017}
+    depends_on: [mongo]
+  mongo:                      # local stand-in for MongoDB Atlas
+    image: mongo:7
+    volumes: [mongo-data:/data/db]
+volumes:
+  mongo-data:
