@@ -1,6 +1,6 @@
 """Operational endpoints."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from app.ai import client as llm
 
@@ -8,6 +8,6 @@ router = APIRouter(tags=["system"])
 
 
 @router.get("/health")
-def health() -> dict[str, str]:
-    """Liveness probe and active LLM provider."""
-    return {"status": "ok", "llm_provider": llm.provider()}
+def health(request: Request) -> dict[str, str]:
+    """Liveness probe, active LLM provider and where data is stored."""
+    return {"status": "ok", "llm_provider": llm.provider(), "storage": getattr(request.app.state, "storage", "unknown")}

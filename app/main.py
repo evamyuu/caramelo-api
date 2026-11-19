@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from pymongo.errors import PyMongoError
 
 from app.api.router import api_router
 from app.config import settings
@@ -31,26 +32,40 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     """Wire storage at startup and release it at shutdown (composition root)."""
     if not settings.mongodb_uri:
         logger.info("MONGODB_URI not set: using in-memory storage")
-        application.state.events = InMemoryEventRepository()
-        application.state.knowledge = InMemoryKnowledgeRepository()
-        application.state.routines = InMemoryRoutineRepository()
+        _use_memory(application, "memory")
         yield
         return
     client = mongo.create_client(settings.mongodb_uri)
     database = mongo.get_database(client, settings.mongodb_database)
     repository = MongoEventRepository(database, settings.event_ttl_days)
+    routines = MongoRoutineRepository(database, settings.event_ttl_days)
+    try:
+        await repository.ensure_indexes()
+        await routines.ensure_indexes()
+    except PyMongoError:
+        # Keep the service up (e.g. Atlas network access not yet granted to this host) and say so in /health.
+        logger.exception("MongoDB Atlas unreachable at startup: using in-memory storage")
+        _use_memory(application, "memory (atlas unreachable)")
+        await client.close()
+        yield
+        return
+    application.state.storage = "atlas"
+    application.state.events = repository
+    application.state.routines = routines
     application.state.knowledge = FallbackKnowledgeRepository(
         MongoKnowledgeRepository(database), InMemoryKnowledgeRepository()
     )
-    await repository.ensure_indexes()
-    application.state.events = repository
-    routines = MongoRoutineRepository(database, settings.event_ttl_days)
-    await routines.ensure_indexes()
-    application.state.routines = routines
     try:
         yield
     finally:
         await client.close()
+
+
+def _use_memory(application: FastAPI, storage: str) -> None:
+    application.state.storage = storage
+    application.state.events = InMemoryEventRepository()
+    application.state.knowledge = InMemoryKnowledgeRepository()
+    application.state.routines = InMemoryRoutineRepository()
 
 
 def create_app() -> FastAPI:
