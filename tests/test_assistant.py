@@ -31,3 +31,14 @@ async def test_fallback_is_used_when_the_primary_search_fails():
 
     chunks = await FallbackKnowledgeRepository(Failing(), InMemoryKnowledgeRepository()).search("golpe do motoboy")
     assert chunks[0].title == "Golpe do motoboy"
+
+
+def test_sources_endpoint_lists_every_curated_source(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+
+    monkeypatch.delenv("MONGODB_URI", raising=False)
+    with TestClient(create_app()) as client:
+        sources = client.get("/api/v1/assistant/sources").json()["sources"]
+    assert any(entry["source"] == "INSS" and "Prova de vida do INSS" in entry["titles"] for entry in sources)
