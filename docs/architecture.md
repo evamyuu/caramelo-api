@@ -40,6 +40,12 @@ flowchart LR
 - **Pure scoring functions.** `risk.assess_call` and `link_scanner.evaluate` do no I/O and
   are unit-tested without a browser.
 - **Graceful degradation.** No LLM key means rules mode; no MongoDB means in-memory events.
+- **Guardrails in code** (`app/ai/guardrails.py`). Input: outside text is cleaned, fenced in data
+  markers the prompts say never to obey, and screened for prompt injection; an injection attempt never
+  reaches the model, and a page that gives orders turns the secure room suspicious (consent for every
+  tap, no typing). What the model may type is checked (no codes, numbers or instructions). Output: every
+  reply is checked before the screen or the voice (asks for a secret, moves money, untrusted link, phone
+  number, leaked instructions, pet names) and replaced by a code-written fallback when it breaks a rule.
 - **Guide mode before evasion.** Sites may refuse automated browsers (gov.br rejects any captcha
   solved in one with `ERL0000900`). The secure session never disguises its browser; it switches to
   guide mode (`app/services/guides.py`): the official site opens in the user's own browser and

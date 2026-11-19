@@ -36,7 +36,7 @@ from fastapi import WebSocket
 from playwright.async_api import Page
 
 from app.ai import client as llm
-from app.ai import prompts
+from app.ai import guardrails, prompts
 from app.core.browser import launch
 from app.services import guides
 
@@ -76,6 +76,23 @@ GUIDE_ON_REJECTION = (
     "O site do governo não deixou a sala segura entrar. Vamos fazer no seu celular: eu falo cada passo."
 )
 GUIDE_ON_REQUEST = "Combinado, vamos fazer no seu celular. Eu falo cada passo."
+SUSPICIOUS_PAGE_SPEECH = (
+    "Essa página tem um texto tentando me dar ordens. Vou com cuidado e peço a sua licença para tudo."
+)
+FINISH_FALLBACK = "Terminei. O resultado está na tela. Se ficar em dúvida, chame o Pedro."
+MAX_TYPED_CHARS = 60
+_MANY_DIGITS = re.compile(r"\d{4,}")
+
+
+def safe_to_type(text: str) -> bool:
+    """What the model may type for the user: short, no codes or numbers, no instructions. Checked in code."""
+    without_years = re.sub(r"\b(?:19|20)\d{2}\b", "", text)  # "restituição 2026" is fine; PINs and codes are not
+    plain = re.sub(r"[\s.\-/]", "", without_years)
+    return (
+        0 < len(text) <= MAX_TYPED_CHARS
+        and not _MANY_DIGITS.search(plain)
+        and not guardrails.looks_like_injection(text)
+    )
 
 
 class _SwitchToGuide(Exception):
@@ -122,6 +139,7 @@ class SecureSession:
         self._handover_field: str | None = None
         self._alive = True
         self._history: list[str] = []
+        self._suspicious = False  # the page tried to give Caramelo orders (prompt injection)
         self._page: Page
 
     async def _send(self, **message: Any) -> None:
@@ -249,24 +267,35 @@ class SecureSession:
             elements = await self._page.evaluate(_LIST_INTERACTIVE_ELEMENTS_JS)
             if not elements and not page_text.strip():  # still blank: never conclude from an empty page
                 continue
+            page_says = page_text + " " + " ".join(element["text"] for element in elements)
+            if not self._suspicious and guardrails.looks_like_injection(page_says):
+                self._suspicious = True  # from now on: consent for every tap, no typing
+                await self._send(type="speech", speech=SUSPICIOUS_PAGE_SPEECH)
             decision = await self._next_action(elements, page_text)
             if decision["action"] == "finish":
-                await self._send(type="done", success=True, result=decision.get("result") or "Pronto!")
+                result = guardrails.guard_output(decision.get("result"), FINISH_FALLBACK).text
+                await self._send(type="done", success=True, result=result)
                 return
             element = next((e for e in elements if e["index"] == decision.get("index")), None)
             if element is None:
                 continue
-            if decision.get("speech"):
-                await self._send(type="speech", speech=decision["speech"])
-            needs_consent = decision["action"] == "click" and SENSITIVE_ACTION.search(element["text"])
+            speech = guardrails.guard_output(decision.get("speech"), "").text
+            if speech:
+                await self._send(type="speech", speech=speech)
+            needs_consent = decision["action"] == "click" and (
+                self._suspicious or SENSITIVE_ACTION.search(element["text"])
+            )
             if needs_consent and not await self._request_consent(f"Posso tocar em “{element['text']}”?"):
                 await self._send(type="done", success=False, result="Tudo bem, não fiz. Parei por aqui.")
                 return
             locator = self._page.locator(f'[data-caramelo-id="{element["index"]}"]')
             if decision["action"] == "type":
-                if element["type"] == "password":
-                    continue  # never, regardless of what the model asked for
-                await locator.fill(decision.get("text", ""))
+                text = str(decision.get("text") or "")
+                # Never a password field, never on a suspicious page, never codes or instructions.
+                if element["type"] == "password" or self._suspicious or not safe_to_type(text):
+                    self._history.append(f'recusei digitar em “{element["text"]}”')
+                    continue
+                await locator.fill(text)
             else:
                 await locator.click(timeout=5_000)
             self._history.append(f'{decision["action"]} “{element["text"]}”')

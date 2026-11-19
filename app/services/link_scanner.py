@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 import httpx
 
 from app.ai import client as llm
-from app.ai import prompts
+from app.ai import guardrails, prompts
 from app.core.browser import launch
 from app.services.risk import CAUTION_THRESHOLD, MAX_SCORE, SCAM_THRESHOLD
 
@@ -215,7 +215,7 @@ async def scan(url: str) -> dict[str, Any]:
         "verdict": evaluation.verdict,
         "findings": evaluation.findings,
         "signals": evaluation.signals,
-        "speech": (speech or _FALLBACK_SPEECH[evaluation.verdict]).strip(),
+        "speech": guardrails.guard_output(speech, _FALLBACK_SPEECH[evaluation.verdict]).text,
         "screenshot": "data:image/jpeg;base64," + base64.b64encode(screenshot).decode(),
         "llm_provider": llm.provider(),
     }

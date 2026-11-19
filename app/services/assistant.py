@@ -11,7 +11,7 @@ import logging
 from dataclasses import dataclass
 
 from app.ai import client as llm
-from app.ai import prompts
+from app.ai import guardrails, prompts
 from app.db.repositories.knowledge import KnowledgeChunk, KnowledgeRepository
 
 logger = logging.getLogger(__name__)
@@ -35,9 +35,15 @@ async def _retrieve(knowledge: KnowledgeRepository, question: str) -> list[Knowl
 
 async def answer(question: str, knowledge: KnowledgeRepository) -> AssistantAnswer:
     """Answer a free-form question from the knowledge base."""
+    question = guardrails.clean_input(question)
     chunks = await _retrieve(knowledge, question)
     if not chunks:
         return AssistantAnswer(NO_ANSWER, [], grounded=False)
-    reply = await llm.complete(prompts.grounded_answer(question, [(c.title, c.text) for c in chunks]))
+    reply = None
+    if guardrails.looks_like_injection(question):  # never hand an injection attempt to the model
+        logger.warning("Injection attempt in a question: answering from the knowledge base only")
+    else:
+        reply = await llm.complete(prompts.grounded_answer(question, [(c.title, c.text) for c in chunks]))
     sources = list(dict.fromkeys(chunk.source for chunk in chunks))
-    return AssistantAnswer((reply or chunks[0].text).strip(), sources, grounded=True)
+    # The reviewed chunk is the safe fallback: it is shown whenever the model's reply breaks a rule.
+    return AssistantAnswer(guardrails.guard_output(reply, chunks[0].text).text, sources, grounded=True)

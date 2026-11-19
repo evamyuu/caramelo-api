@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 
 from app.ai import client as llm
-from app.ai import prompts
+from app.ai import guardrails, prompts
 from app.api.dependencies import Routines
 from app.api.schemas import ActivityRequest, RoutineRequest
 from app.services import routines as service
@@ -41,14 +41,27 @@ async def create_routine(body: RoutineRequest, repository: Routines) -> dict[str
         fields = {k: v for k, v in body.suggestion.items() if k in service.Routine.__dataclass_fields__}
         routine = service.Routine(**{**fields, "id": "", "created": "", "done": [], "source": "learned"})
     else:
-        today = datetime.now(BRAZIL_TZ).strftime("%A, %d/%m/%Y")
-        reply = await llm.complete(prompts.routine_from_request(body.text or "", today), json_output=True)
-        routine = service.from_model(llm.parse_json(reply), body.text or "")
+        text = guardrails.clean_input(body.text or "", limit=300)
+        if guardrails.looks_like_injection(text):  # never hand an injection attempt to the model
+            routine = service.parse_rules(text)
+        else:
+            today = datetime.now(BRAZIL_TZ).strftime("%A, %d/%m/%Y")
+            reply = await llm.complete(prompts.routine_from_request(text, today), json_output=True)
+            routine = service.from_model(llm.parse_json(reply), text)
     if routine is None:
         raise HTTPException(422, "Não entendi quando. Diga, por exemplo: “todo dia às 14h, remédio da pressão”.")
-    if routine.url and is_blocked(routine.url):  # same rule as the secure room: never a bank
+    return _out(await repository.add(_safe(routine)))
+
+
+def _safe(routine: service.Routine) -> service.Routine:
+    """Text the user will see and hear passes the output guard; tasks only open hand-checked pages, never a bank."""
+    routine.title = guardrails.guard_output(guardrails.clean_input(routine.title, 80), "Lembrete").text
+    if routine.task:
+        routine.task = guardrails.clean_input(routine.task, 200)
+    trusted = set(service.TASK_SITES.values())
+    if routine.url and (routine.url not in trusted or is_blocked(routine.url)):
         routine.kind, routine.task, routine.url = "reminder", None, None
-    return _out(await repository.add(routine))
+    return routine
 
 
 @router.delete("/routines/{routine_id}")

@@ -70,6 +70,7 @@ caramelo-api/
 - **Aberto para extensão** - Um novo fornecedor de IA é uma classe em `ai/providers`; um novo armazenamento é um repositório
 - **A IA nunca decide a segurança** - Veredito, consentimento e credenciais são garantidos em código. O modelo só redige explicações e sugere passos de navegação, e o serviço funciona sem modelo nenhum (modo `rules`)
 - **Privacidade desde a concepção** - Eventos de risco não guardam telefone, URL nem id de usuário, e expiram por índice TTL. Senhas digitadas durante a entrega são repassadas à página e nunca registradas em log nem enviadas a um modelo
+- **Guardrails na entrada e na saída** - Tudo o que vem de fora (o que a pessoa diz, o texto dos sites) vai para o modelo entre marcadores de dado e é checado contra injeção de instruções; uma tentativa nunca chega ao modelo, e uma página que tenta dar ordens vira suspeita (licença para tudo, nada digitado). Toda resposta é checada antes de chegar à tela e à voz: nada de pedir senha, código ou CPF, mandar fazer Pix, link fora do gov.br, telefone ou apelido ("vovó"); se quebrar uma regra, vale a resposta segura escrita em código
 - **Respeito às proteções dos sites** - Quando um site recusa navegadores automatizados (o gov.br rejeita captchas resolvidos neles), o Caramelo não disfarça o navegador: passa para o **modo guia**, abre o site oficial no navegador da própria pessoa e fala cada passo
 
 Mais detalhes em [`docs/architecture.md`](docs/architecture.md) e [`SECURITY.md`](SECURITY.md).

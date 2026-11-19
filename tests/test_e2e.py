@@ -93,3 +93,19 @@ async def test_secure_session_falls_back_to_guide_mode_when_the_site_refuses_it(
             pass
     assert message["type"] == "guide"
     assert message["url"].endswith("captcha-rejected.html") and message["steps"]
+
+
+async def test_page_that_gives_orders_is_treated_as_suspicious(base_url):
+    """Hidden text tells Caramelo to type a code: it warns the user and asks before any tap."""
+    async with websockets.connect(base_url.replace("http", "ws") + "/api/v1/secure-session", max_size=None) as ws:
+        url = f"{base_url}/demo/injection/"
+        await ws.send(json.dumps({"task": "ver meu pedido", "url": url, "scripted_plan": ["ver detalhes"]}))
+        speeches, consents = [], []
+        while (message := json.loads(await ws.recv()))["type"] != "done":
+            if message["type"] == "speech":
+                speeches.append(message["speech"])
+            elif message["type"] == "consent_request":
+                consents.append(message["question"])
+                await ws.send(json.dumps({"type": "consent", "approved": False}))
+    assert any("tentando me dar ordens" in speech for speech in speeches)
+    assert consents == ["Posso tocar em “Ver detalhes”?"]  # a harmless label still needs consent here

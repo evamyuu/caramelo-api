@@ -20,6 +20,7 @@ from app.ai.prompts import PERSONA
 from app.ai.providers.anthropic import AnthropicProvider
 from app.ai.providers.base import TIMEOUT_SECONDS, LLMProvider
 from app.ai.providers.gemini import GeminiProvider
+from app.ai.tone import respectful
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -45,17 +46,19 @@ async def complete(prompt: str, system: str = PERSONA, *, json_output: bool = Fa
     """Send one prompt to the configured model.
 
     Returns:
-        The model text, or ``None`` when no provider is configured or the call fails.
+        The model text in a respectful tone (see ``app.ai.tone``), or ``None`` when
+        no provider is configured or the call fails.
     """
     active = _active_provider()
     if active is None:
         return None
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
-            return await active.complete(client, prompt, system, json_output=json_output)
+            reply = await active.complete(client, prompt, system, json_output=json_output)
     except (httpx.HTTPError, KeyError, IndexError) as exc:
         logger.warning("LLM call failed, falling back to rules: %s", exc)
         return None
+    return respectful(reply) if reply else reply
 
 
 def parse_json(text: str | None) -> dict[str, Any] | None:
