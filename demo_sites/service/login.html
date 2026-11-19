@@ -1,4 +1,15 @@
-<!doctype html><meta charset="utf-8"><title>Login (teste)</title>
-<body style="font-family:sans-serif;padding:20px;font-size:18px"><h2>Identificação</h2>
-<form onsubmit="if(document.getElementById('s').value)location='dashboard.html';return false">
-<input type="password" id="s" placeholder="Senha" style="font-size:20px;padding:10px"><br><br><button>OK</button></form></body>
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Identificação · Portal Cidadão (demonstração)</title><link rel="stylesheet" href="style.css"></head>
+<body><div class="demo-strip">Site fictício de demonstração do Caramelo</div>
+<header class="top"><svg class="top__logo" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 4 9v2h24V9z" fill="#f2a541"/><path d="M7 13h3v10H7zM14.5 13h3v10h-3zM22 13h3v10h-3zM4 25h24v3H4z" fill="#fff"/></svg><div class="top__name">Portal Cidadão<small>Identificação</small></div></header>
+<main>
+  <h1>Identificação</h1>
+  <div class="card">
+    <div class="who">&#128100; Conta de <strong>Maria A. S.</strong></div>
+    <form onsubmit="if(document.getElementById('s').value)location='dashboard.html';return false">
+      <label class="field" for="s">Senha da sua conta</label>
+      <input class="input" type="password" id="s" placeholder="Senha" autocomplete="off">
+      <p class="hint">Ninguém do portal pede a sua senha por telefone ou mensagem.</p>
+      <button class="btn btn--primary" style="margin-top:12px">Continuar</button>
+    </form>
+  </div>
+</main></body></html>
