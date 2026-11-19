@@ -8,6 +8,7 @@ from fastapi import Depends, Request
 
 from app.db.repositories.events import EventRepository
 from app.db.repositories.knowledge import KnowledgeRepository
+from app.db.repositories.routines import RoutineRepository
 
 
 def get_event_repository(request: Request) -> EventRepository:
@@ -22,3 +23,10 @@ def get_knowledge_repository(request: Request) -> KnowledgeRepository:
 
 
 Knowledge = Annotated[KnowledgeRepository, Depends(get_knowledge_repository)]
+
+
+def get_routine_repository(request: Request) -> RoutineRepository:
+    return request.app.state.routines
+
+
+Routines = Annotated[RoutineRepository, Depends(get_routine_repository)]

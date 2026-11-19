@@ -75,6 +75,8 @@ class Evaluation:
 
     score: int = 0
     findings: list[str] = field(default_factory=list)
+    # Stable keys of the findings, for anonymous statistics (never the URL or host).
+    signals: list[str] = field(default_factory=list)
 
     @property
     def verdict(self) -> str:
@@ -82,9 +84,10 @@ class Evaluation:
             return "scam"
         return "caution" if self.score >= CAUTION_THRESHOLD else "safe"
 
-    def add(self, points: int, finding: str) -> None:
+    def add(self, points: int, finding: str, signal: str) -> None:
         self.score = min(MAX_SCORE, self.score + points)
         self.findings.append(finding)
+        self.signals.append(signal)
 
 
 def _is_official(host: str, domains: tuple[str, ...]) -> bool:
@@ -107,34 +110,34 @@ def evaluate(facts: PageFacts) -> Evaluation:
     text, title = facts.text.lower(), facts.title.lower()
 
     if host != requested_host:
-        result.add(15, f"O link levou para outro endereço: {host}")
+        result.add(15, f"O link levou para outro endereço: {host}", "redirect")
     if not facts.final_url.startswith("https://") and not is_local:
-        result.add(15, "O site não tem cadeado (sem https)")
+        result.add(15, "O site não tem cadeado (sem https)", "no_https")
     if re.fullmatch(r"\d+\.\d+\.\d+\.\d+", host) and not is_local:
-        result.add(25, "O endereço é só um número, não um nome")
+        result.add(25, "O endereço é só um número, não um nome", "ip_address")
     if "xn--" in host:
-        result.add(25, "O endereço usa letras disfarçadas")
+        result.add(25, "O endereço usa letras disfarçadas", "lookalike_letters")
     if host.endswith(SUSPICIOUS_TLDS):
-        result.add(15, "O endereço termina de um jeito muito usado em golpes")
+        result.add(15, "O endereço termina de um jeito muito usado em golpes", "suspicious_tld")
     if host.count("-") >= 2 or host.count(".") >= 4:
-        result.add(10, "O endereço é comprido e estranho")
+        result.add(10, "O endereço é comprido e estranho", "odd_address")
 
     for brand, domains in OFFICIAL_DOMAINS.items():
         if (brand in title or brand in text[:1500]) and not _is_official(host, domains):
-            result.add(35, f"A página usa o nome “{brand}”, mas o endereço não é o oficial")
+            result.add(35, f"A página usa o nome “{brand}”, mas o endereço não é o oficial", "brand_impersonation")
             break
 
     requested_data = [term for term in PERSONAL_DATA_TERMS if term in text]
     if facts.has_password_field:
-        result.add(20, "Pede senha")
+        result.add(20, "Pede senha", "asks_password")
     if len(requested_data) >= 2:
-        result.add(15, "Pede dados pessoais: " + ", ".join(requested_data[:3]))
+        result.add(15, "Pede dados pessoais: " + ", ".join(requested_data[:3]), "asks_personal_data")
     if any(term in text for term in URGENCY_TERMS):
-        result.add(10, "Usa pressa e ameaça para você agir rápido")
+        result.add(10, "Usa pressa e ameaça para você agir rápido", "urgency")
     if facts.downloads:
-        result.add(30, "Tentou baixar um arquivo sozinho")
+        result.add(30, "Tentou baixar um arquivo sozinho", "auto_download")
     if facts.domain_age_days is not None and facts.domain_age_days < YOUNG_DOMAIN_DAYS:
-        result.add(25, f"O site foi criado há {facts.domain_age_days} dias")
+        result.add(25, f"O site foi criado há {facts.domain_age_days} dias", "young_domain")
     return result
 
 
@@ -182,6 +185,7 @@ async def scan(url: str) -> dict[str, Any]:
         except Exception as exc:  # noqa: BLE001 - any navigation failure is reported, not raised
             return {
                 "url": url, "verdict": "unreachable", "score": 50, "findings": ["O link não abriu."],
+                "signals": ["unreachable"],
                 "speech": "Esse link não abriu. Melhor não insistir.", "error": str(exc)[:120],
             }  # fmt: skip
         host = urlparse(page.url).hostname or ""
@@ -210,6 +214,7 @@ async def scan(url: str) -> dict[str, Any]:
         "score": evaluation.score,
         "verdict": evaluation.verdict,
         "findings": evaluation.findings,
+        "signals": evaluation.signals,
         "speech": (speech or _FALLBACK_SPEECH[evaluation.verdict]).strip(),
         "screenshot": "data:image/jpeg;base64," + base64.b64encode(screenshot).decode(),
         "llm_provider": llm.provider(),

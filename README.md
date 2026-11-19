@@ -26,6 +26,8 @@ O **Caramelo** é um assistente que protege e ajuda pessoas idosas no Brasil. Es
 | Navegação assistida com consentimento e entrega de CPF, senha, código e captcha para a pessoa, com modo guia como fallback | Real | `WS /api/v1/secure-session` |
 | Score de risco de ligações (sinais ponderados e explicáveis) | Score real, ligação simulada | `POST /api/v1/calls/assess` |
 | Insights anônimos de golpes (agregação no MongoDB) | Real | `GET /api/v1/insights/summary` |
+| Mapa de golpes para parceiros: tendência, ranking por UF, sinais mais comuns e detecção de ondas (`$facet` no Atlas) | Real (com dados simulados marcados para demo) | `GET /api/v1/insights/dashboard` |
+| Rotinas: lembretes e tarefas agendadas em linguagem natural, que o Caramelo dispara sozinho e aprende com o uso | Real | `GET/POST /api/v1/routines`, `POST /api/v1/activity` |
 | Assistente com respostas fundamentadas (RAG sobre base curada, Atlas Vector Search) | Real, funciona sem chave de LLM | `POST /api/v1/assistant/chat` |
 | SIM Swap da operadora (CAMARA) e saldo via Open Finance | Stubs no formato real do payload | `GET /api/v1/accounts/balance` |
 

@@ -8,4 +8,4 @@ async def test_summary_counts_only_blocked_events():
     await repository.add("link", 10)
     summary = await repository.summary()
     assert summary == {"total": 3, "blocked": 2, "by_kind": {"link": 1, "call": 1},
-                       "by_region": {"SP-capital": 2}}
+                       "by_region": {"ND": 2}}

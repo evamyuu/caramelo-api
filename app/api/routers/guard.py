@@ -18,7 +18,7 @@ _DEMO_PHONE_NUMBER = "+5511999990000"
 async def scan_link(body: LinkScanRequest, events: Events) -> dict[str, Any]:
     """Open a link in an isolated browser and return a scam verdict."""
     report = await link_scanner.scan(body.url)
-    await events.add("link", report["score"])
+    await events.add("link", report["score"], body.region, report.get("signals"))
     return report
 
 
@@ -26,5 +26,5 @@ async def scan_link(body: LinkScanRequest, events: Events) -> dict[str, Any]:
 async def assess_call(body: CallAssessmentRequest, events: Events) -> dict[str, Any]:
     """Score an incoming call from its observed signals."""
     assessment = risk.assess_call(body.signals)
-    await events.add("call", assessment.score)
+    await events.add("call", assessment.score, body.region, assessment.signals)
     return {**asdict(assessment), "carrier": integrations.sim_swap_retrieve_date(_DEMO_PHONE_NUMBER)}

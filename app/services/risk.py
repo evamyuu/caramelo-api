@@ -57,6 +57,8 @@ class CallRiskAssessment:
     reasons: list[str]
     speech: str
     notify_family: bool
+    # Stable keys of the observed signals, for anonymous statistics.
+    signals: list[str]
 
 
 def level_for(score: int) -> RiskLevel:
@@ -86,4 +88,5 @@ def assess_call(signals: dict[str, bool]) -> CallRiskAssessment:
         reasons=[CALL_SIGNALS[key].label for key in active],
         speech=_SPEECH[level],
         notify_family=level is RiskLevel.SCAM,
+        signals=active,
     )

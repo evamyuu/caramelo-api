@@ -20,6 +20,7 @@ from app.db.repositories.knowledge import (
     InMemoryKnowledgeRepository,
     MongoKnowledgeRepository,
 )
+from app.db.repositories.routines import InMemoryRoutineRepository, MongoRoutineRepository
 
 logger = logging.getLogger(__name__)
 DEMO_SITES_DIR = Path(__file__).resolve().parent.parent / "demo_sites"
@@ -32,6 +33,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         logger.info("MONGODB_URI not set: using in-memory storage")
         application.state.events = InMemoryEventRepository()
         application.state.knowledge = InMemoryKnowledgeRepository()
+        application.state.routines = InMemoryRoutineRepository()
         yield
         return
     client = mongo.create_client(settings.mongodb_uri)
@@ -42,6 +44,9 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     )
     await repository.ensure_indexes()
     application.state.events = repository
+    routines = MongoRoutineRepository(database, settings.event_ttl_days)
+    await routines.ensure_indexes()
+    application.state.routines = routines
     try:
         yield
     finally:

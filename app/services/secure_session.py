@@ -86,7 +86,7 @@ class _SwitchToGuide(Exception):
         self.speech = speech
 
 
-def _is_blocked(url: str) -> bool:
+def is_blocked(url: str) -> bool:
     host = urlparse(url).hostname or ""
     return any(fragment in host for fragment in BLOCKED_HOST_FRAGMENTS)
 _LIST_INTERACTIVE_ELEMENTS_JS = """() => {
@@ -225,7 +225,7 @@ class SecureSession:
             with contextlib.suppress(Exception):
                 await self._page.wait_for_load_state("networkidle", timeout=PAGE_SETTLE_MS)
 
-            if _is_blocked(self._page.url):
+            if is_blocked(self._page.url):
                 await self._send(type="done", success=False, result=BANK_REFUSAL)
                 return
 
@@ -275,7 +275,7 @@ class SecureSession:
 
     async def run(self) -> None:
         """Run the task to completion, then destroy the browser."""
-        if _is_blocked(self._url):
+        if is_blocked(self._url):
             await self._send(type="done", success=False, result=BANK_REFUSAL)
             return
         driver, browser = await launch()

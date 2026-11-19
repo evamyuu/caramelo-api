@@ -52,3 +52,17 @@ def grounded_answer(question: str, passages: list[tuple[str, str]]) -> str:
         "Responda em no máximo 3 frases curtas usando SÓ as informações conferidas. "
         "Se elas não responderem à pergunta, diga que não sabe e ofereça chamar alguém da família."
     )
+
+
+def routine_from_request(request: str, today: str) -> str:
+    """Turn a spoken routine request into a strict JSON object."""
+    return (
+        f"Hoje é {today}. A Maria pediu: “{request}”.\n"
+        "Transforme o pedido numa rotina. Responda SÓ um JSON: "
+        '{"title":"nome curto da rotina","kind":"reminder|task","time":"HH:MM",'
+        '"days":[dias da semana, 0=segunda ... 6=domingo, vazio se todo dia],"month_day":dia do mês ou null,'
+        '"task":"se task, o que fazer no site, em uma frase","url":"se task, o endereço oficial https do serviço"}.\n'
+        "Use task só quando for algo a fazer num site de serviço (INSS, gov.br, Receita, SUS); "
+        "remédio, consulta, conta ou ligação são reminder. Se a hora não foi dita, escolha 09:00. "
+        "Nunca use site de banco."
+    )
