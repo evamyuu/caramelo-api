@@ -23,10 +23,10 @@ O **Caramelo** é um assistente que protege e ajuda pessoas idosas no Brasil. Es
 | Funcionalidade | Status | Endpoint |
 | --- | --- | --- |
 | Análise isolada de links (navegador headless descartável, score explicável) | Real | `POST /api/v1/links/scan` |
-| Navegação assistida com consentimento e entrega da senha para a pessoa | Real | `WS /api/v1/secure-session` |
+| Navegação assistida com consentimento e entrega de CPF, senha, código e captcha para a pessoa, com modo guia como fallback | Real | `WS /api/v1/secure-session` |
 | Score de risco de ligações (sinais ponderados e explicáveis) | Score real, ligação simulada | `POST /api/v1/calls/assess` |
 | Insights anônimos de golpes (agregação no MongoDB) | Real | `GET /api/v1/insights/summary` |
-| Chat com o assistente | Real quando há chave de LLM | `POST /api/v1/assistant/chat` |
+| Assistente com respostas fundamentadas (RAG sobre base curada, Atlas Vector Search) | Real, funciona sem chave de LLM | `POST /api/v1/assistant/chat` |
 | SIM Swap da operadora (CAMARA) e saldo via Open Finance | Stubs no formato real do payload | `GET /api/v1/accounts/balance` |
 
 Documentação interativa: `http://localhost:8000/docs`.
@@ -55,6 +55,7 @@ caramelo-api/
 │   ├── db/                     # Persistência
 │   │   ├── mongo.py            # Ciclo de vida do cliente Atlas
 │   │   └── repositories/       # Contrato + implementações MongoDB e em memória
+│   ├── knowledge/              # Base curada sobre o dia a dia da pessoa idosa no Brasil (seed.json)
 │   ├── integrations/           # APIs parceiras (operadora, Open Finance) atrás de stubs
 │   └── core/                   # Inicialização do navegador
 │
@@ -67,6 +68,7 @@ caramelo-api/
 - **Aberto para extensão** - Um novo fornecedor de IA é uma classe em `ai/providers`; um novo armazenamento é um repositório
 - **A IA nunca decide a segurança** - Veredito, consentimento e credenciais são garantidos em código. O modelo só redige explicações e sugere passos de navegação, e o serviço funciona sem modelo nenhum (modo `rules`)
 - **Privacidade desde a concepção** - Eventos de risco não guardam telefone, URL nem id de usuário, e expiram por índice TTL. Senhas digitadas durante a entrega são repassadas à página e nunca registradas em log nem enviadas a um modelo
+- **Respeito às proteções dos sites** - Quando um site recusa navegadores automatizados (o gov.br rejeita captchas resolvidos neles), o Caramelo não disfarça o navegador: passa para o **modo guia**, abre o site oficial no navegador da própria pessoa e fala cada passo
 
 Mais detalhes em [`docs/architecture.md`](docs/architecture.md) e [`SECURITY.md`](SECURITY.md).
 
@@ -83,7 +85,7 @@ Mais detalhes em [`docs/architecture.md`](docs/architecture.md) e [`SECURITY.md`
 - **Modo `rules`** - Fallback determinístico quando nenhuma chave está configurada
 
 ### Dados & Infraestrutura
-- **MongoDB Atlas (PyMongo Async)** - Eventos de risco, agregação `$facet`, índice TTL, Stable API v1
+- **MongoDB Atlas (PyMongo Async)** - Eventos de risco com agregação `$facet` e índice TTL; base de conhecimento com Vector Search e auto-embedding (`voyage-4-lite`); Stable API v1
 - **Docker** - Conteinerização e ambiente isolado
 - **GitHub Actions** - Integração contínua
 - **Pytest + Ruff** - Testes e linting
@@ -124,9 +126,16 @@ cp .env.example .env
 | `MONGODB_URI` | String de conexão do Atlas | vazio (em memória) |
 | `CORS_ORIGINS` | Origens web permitidas | `http://localhost:5173` |
 
-4. **Suba a API:**
+4. **Carregue a base de conhecimento no Atlas (opcional):**
+
+Crie antes o índice `knowledge_vector` (veja [`docs/architecture.md`](docs/architecture.md)). Sem ele, o assistente usa busca por palavras-chave na mesma base. O script lê `MONGODB_URI` do ambiente, não do `.env`:
 ```bash
-uvicorn app.main:app --reload
+MONGODB_URI="mongodb+srv://..." python -m scripts.seed_knowledge
+```
+
+5. **Suba a API:**
+```bash
+uvicorn app.main:app --reload --env-file .env
 ```
 
 Ou com Docker (API + MongoDB local):
@@ -134,10 +143,18 @@ Ou com Docker (API + MongoDB local):
 docker compose up --build
 ```
 
-5. **Rode os testes e o lint:**
+6. **Rode os testes e o lint:**
 ```bash
 ruff check . && pytest
 ```
+
+---
+
+## 🧭 Próximos Passos
+
+- **Login Único gov.br** - Parceria com o governo para integrar o Caramelo como aplicação credenciada (OAuth do gov.br). A pessoa autoriza o acesso uma vez no app oficial, sem captcha nem automação de tela, e o modo guia fica só para os demais sites
+- **Open Finance e CAMARA** - Trocar os stubs de saldo e SIM Swap por integrações reais via agregador autorizado e operadoras
+- **App Android** - Analisar ligações recebidas em tempo real; o score de risco já está pronto na API
 
 ---
 
