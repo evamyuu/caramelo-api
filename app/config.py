@@ -17,7 +17,7 @@ class Settings:
     anthropic_api_key: str = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
     anthropic_model: str = field(default_factory=lambda: os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5"))
     gemini_api_key: str = field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
-    gemini_model: str = field(default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
+    gemini_model: str = field(default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite"))
     mongodb_uri: str = field(default_factory=lambda: os.getenv("MONGODB_URI", ""))
     mongodb_database: str = field(default_factory=lambda: os.getenv("MONGODB_DATABASE", "caramelo"))
     event_ttl_days: int = field(default_factory=lambda: int(os.getenv("EVENT_TTL_DAYS", "90")))
