@@ -15,6 +15,11 @@ from app.api.router import api_router
 from app.config import settings
 from app.db import mongo
 from app.db.repositories.events import InMemoryEventRepository, MongoEventRepository
+from app.db.repositories.knowledge import (
+    FallbackKnowledgeRepository,
+    InMemoryKnowledgeRepository,
+    MongoKnowledgeRepository,
+)
 
 logger = logging.getLogger(__name__)
 DEMO_SITES_DIR = Path(__file__).resolve().parent.parent / "demo_sites"
@@ -24,13 +29,16 @@ DEMO_SITES_DIR = Path(__file__).resolve().parent.parent / "demo_sites"
 async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     """Wire storage at startup and release it at shutdown (composition root)."""
     if not settings.mongodb_uri:
-        logger.info("MONGODB_URI not set: using in-memory event storage")
+        logger.info("MONGODB_URI not set: using in-memory storage")
         application.state.events = InMemoryEventRepository()
+        application.state.knowledge = InMemoryKnowledgeRepository()
         yield
         return
     client = mongo.create_client(settings.mongodb_uri)
-    repository = MongoEventRepository(
-        mongo.get_database(client, settings.mongodb_database), settings.event_ttl_days
+    database = mongo.get_database(client, settings.mongodb_database)
+    repository = MongoEventRepository(database, settings.event_ttl_days)
+    application.state.knowledge = FallbackKnowledgeRepository(
+        MongoKnowledgeRepository(database), InMemoryKnowledgeRepository()
     )
     await repository.ensure_indexes()
     application.state.events = repository

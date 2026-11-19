@@ -39,5 +39,16 @@ def next_browser_action(
         f"Elementos clicáveis: {json.dumps(elements, ensure_ascii=False)}\n"
         'Responda SÓ um JSON: {"action":"click|type|finish","index":numero,"text":"se type",'
         '"speech":"o que você diz para a Maria, 1 frase simples","result":"se finish, a resposta '
-        'para a Maria em linguagem simples"}. Nunca digite senha. Use finish quando tiver a resposta.'
+        'para a Maria em linguagem simples"}. Nunca digite senha, CPF nem código: quem digita é a Maria. '
+        'Para entrar no gov.br use o CPF, nunca "Login com seu banco". Use finish quando tiver a resposta.'
+    )
+
+
+def grounded_answer(question: str, passages: list[tuple[str, str]]) -> str:
+    """Ask for an answer restricted to the retrieved passages (RAG)."""
+    context = "\n".join(f"- {title}: {text}" for title, text in passages)
+    return (
+        f"Pergunta da Maria: {question}\n\nInformações conferidas:\n{context}\n\n"
+        "Responda em no máximo 3 frases curtas usando SÓ as informações conferidas. "
+        "Se elas não responderem à pergunta, diga que não sabe e ofereça chamar alguém da família."
     )
