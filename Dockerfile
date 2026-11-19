@@ -1,8 +1,8 @@
-FROM mcr.microsoft.com/playwright/python:v1.48.0-jammy
+FROM mcr.microsoft.com/playwright/python:v1.48.0-noble
 WORKDIR /srv
 COPY pyproject.toml ./
-# Install the browser that matches the installed Playwright version (pip may pick a newer one than the image).
-RUN pip install --no-cache-dir . && playwright install chromium
+# Ubuntu 24.04 image (Python 3.12). Install the browser that matches the installed Playwright version.
+RUN pip install --no-cache-dir --break-system-packages . && playwright install chromium
 COPY app ./app
 COPY demo_sites ./demo_sites
 COPY scripts ./scripts
