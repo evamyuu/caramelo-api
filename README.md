@@ -1,97 +1,63 @@
-# 🐕 Caramelo API – Guardião Digital da Pessoa Idosa
+# 🐕 Caramelo API – Interface Agêntica para a Pessoa Idosa
 
-> *"O cão de guarda que mora no celular da vó"*
+> *"Todo mundo merece um caramelo do lado"*
 
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Playwright](https://img.shields.io/badge/Playwright-Chromium-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/python)
 [![MongoDB Atlas](https://img.shields.io/badge/MongoDB-Atlas-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/atlas)
 [![FIAP](https://img.shields.io/badge/FIAP-Global%20Solution%202026-red)](.)
 
-<!-- Banner: adicione docs/assets/banner-github.png e descomente
 <p align="center">
   <br />
   <img src="docs/assets/banner-github.png" alt="Banner Caramelo" width="1000"/>
   <br />
 </p>
--->
 
 ## 🐾 Sobre o Projeto
 
-O **Caramelo** é um assistente que protege e ajuda pessoas idosas no Brasil. Esta é a sua **API**: é aqui que o Caramelo abre links suspeitos longe do celular da vó e faz tarefas online junto com ela, **sempre pedindo permissão antes**. Projeto desenvolvido para a **FIAP Global Solution 2026 (CitizenTech)**. O cliente fica em [`caramelo-app`](https://github.com/evamyuu/caramelo-app).
-
-| Funcionalidade | Status | Endpoint |
-| --- | --- | --- |
-| Análise isolada de links (navegador headless descartável, score explicável) | Real | `POST /api/v1/links/scan` |
-| Navegação assistida com consentimento e entrega de CPF, senha, código e captcha para a pessoa, com modo guia como fallback | Real | `WS /api/v1/secure-session` |
-| Biometria facial ao vivo: quando o site pede a foto do rosto (prova de vida), o Caramelo pede licença, guia a pessoa na câmera dela e coloca a foto direto no campo do site, sem guardar nem mandar ao modelo | Real (Portal Cidadão de teste) | `WS /api/v1/secure-session` |
-| Score de risco de ligações (sinais ponderados e explicáveis) | Score real, ligação simulada | `POST /api/v1/calls/assess` |
-| Insights anônimos de golpes (agregação no MongoDB) | Real | `GET /api/v1/insights/summary` |
-| Mapa de golpes para parceiros: tendência, ranking por UF, sinais mais comuns e detecção de ondas (`$facet` no Atlas) | Real (com dados simulados marcados para demo) | `GET /api/v1/insights/dashboard` |
-| Rotinas: lembretes e tarefas agendadas em linguagem natural, que o Caramelo dispara sozinho e aprende com o uso | Real | `GET/POST /api/v1/routines`, `POST /api/v1/activity` |
-| Assistente com respostas fundamentadas (RAG sobre base curada, Atlas Vector Search) | Real, funciona sem chave de LLM | `POST /api/v1/assistant/chat` |
-| SIM Swap da operadora (CAMARA) e saldo via Open Finance | Stubs no formato real do payload | `GET /api/v1/accounts/balance` |
-
-Documentação interativa: `http://localhost:8000/docs`.
+O **Caramelo** é uma interface agêntica que vira a tela do celular da pessoa idosa — um agente de IA que entende o que ela pede e **faz junto com ela**, cuidando do aparelho, da rotina e dos serviços do dia a dia, sempre com a pessoa no controle e protegendo contra golpes. Esta é a sua **API**, onde o Caramelo navega pelos serviços numa sala segura na nuvem, testa links suspeitos, responde com fonte e mapeia golpes. O app fica em [`caramelo-app`](https://github.com/evamyuu/caramelo-app).
 
 ---
 
 ## 🏗️ Arquitetura
 
-O projeto segue uma **arquitetura em camadas com dependências apontando para dentro**: routers chamam serviços, e serviços dependem de contratos (`EventRepository`, `LLMProvider`), nunca de um fornecedor.
+Este projeto segue uma **arquitetura em camadas** com dependências apontando para dentro — routers chamam serviços, e serviços dependem de contratos, nunca de um fornecedor — e a **segurança decidida em código**, não pela IA:
 
 ```text
 caramelo-api/
 ├── app/
-│   ├── main.py                 # Factory da aplicação e lifespan (composition root)
-│   ├── config.py               # Configurações via variáveis de ambiente
-│   ├── api/                    # Camada HTTP/WebSocket
-│   │   ├── router.py           # Agregação da API v1
-│   │   ├── routers/            # Um router por módulo (guard, companion, insights, secure_session, system)
-│   │   ├── dependencies.py     # Injeção de dependências (repositórios)
-│   │   └── schemas.py          # Modelos de requisição
-│   ├── services/               # Regras de negócio: score de risco, scanner de links, sessão segura
-│   ├── ai/                     # Camada de IA
-│   │   ├── client.py           # Ponto de entrada agnóstico de modelo, com fallback determinístico
-│   │   ├── prompts.py          # Todos os prompts, revisados em um só lugar
-│   │   └── providers/          # Strategy por fornecedor: Anthropic, Gemini
-│   ├── db/                     # Persistência
-│   │   ├── mongo.py            # Ciclo de vida do cliente Atlas
-│   │   └── repositories/       # Contrato + implementações MongoDB e em memória
-│   ├── knowledge/              # Base curada sobre o dia a dia da pessoa idosa no Brasil (seed.json)
-│   ├── integrations/           # APIs parceiras (operadora, Open Finance) atrás de stubs
-│   └── core/                   # Inicialização do navegador
+│   ├── main.py                 # Composition root e ciclo de vida
+│   ├── api/                    # Endpoints REST e WebSocket (sala segura)
+│   ├── services/               # Regras de negócio: sala segura, modo guia, rotinas, links, mapa de golpes
+│   ├── ai/                     # Prompts, guardrails de entrada e saída, provedores (Gemini, Claude)
+│   ├── db/                     # Repositórios MongoDB Atlas e em memória
+│   ├── knowledge/              # Base curada para o RAG
+│   ├── integrations/           # Operadora (CAMARA) e Open Finance
+│   └── core/                   # Navegador isolado (Playwright)
 │
-├── demo_sites/                 # Páginas fictícias usadas na demo e nos testes e2e
+├── demo_sites/                 # Portal Cidadão fictício para demo e testes
 ├── tests/                      # Testes unitários e end-to-end
-└── docs/                       # Notas de arquitetura
+└── docs/                       # Arquitetura e decisões
 ```
-
-### Decisões de Design
-- **Aberto para extensão** - Um novo fornecedor de IA é uma classe em `ai/providers`; um novo armazenamento é um repositório
-- **A IA nunca decide a segurança** - Veredito, consentimento e credenciais são garantidos em código. O modelo só redige explicações e sugere passos de navegação, e o serviço funciona sem modelo nenhum (modo `rules`)
-- **Privacidade desde a concepção** - Eventos de risco não guardam telefone, URL nem id de usuário, e expiram por índice TTL. Senhas digitadas durante a entrega são repassadas à página e nunca registradas em log nem enviadas a um modelo. A foto do rosto vai da memória direto para o campo do site: não vira arquivo, log nem entrada de modelo (LGPD, art. 11)
-- **Guardrails na entrada e na saída** - Tudo o que vem de fora (o que a pessoa diz, o texto dos sites) vai para o modelo entre marcadores de dado e é checado contra injeção de instruções; uma tentativa nunca chega ao modelo, e uma página que tenta dar ordens vira suspeita (licença para tudo, nada digitado). Toda resposta é checada antes de chegar à tela e à voz: nada de pedir senha, código ou CPF, mandar fazer Pix, link fora do gov.br, telefone ou apelido ("vovó"); se quebrar uma regra, vale a resposta segura escrita em código
-- **Respeito às proteções dos sites** - Quando um site recusa navegadores automatizados (o gov.br rejeita captchas resolvidos neles), o Caramelo não disfarça o navegador: passa para o **modo guia**, abre o site oficial no navegador da própria pessoa e fala cada passo
-
-Mais detalhes em [`docs/architecture.md`](docs/architecture.md) e [`SECURITY.md`](SECURITY.md).
 
 ---
 
 ## 🚀 Tecnologias Utilizadas
 
 ### Core Backend
-- **FastAPI + Uvicorn** - HTTP e WebSocket assíncronos
-- **Playwright (Chromium)** - Sessões de navegador descartáveis e isoladas
+- **FastAPI (Python)** - HTTP e WebSocket assíncronos
+- **Playwright (Chromium)** - Sala segura: navegador isolado e descartável na nuvem
 
 ### Inteligência Artificial
-- **Anthropic Claude / Google Gemini** - LLM plugável e opcional
-- **Modo `rules`** - Fallback determinístico quando nenhuma chave está configurada
+- **Google Gemini** - Interpreta o pedido e conduz cada passo da navegação
+- **RAG com Atlas Vector Search** - Respostas sempre com a fonte
+- **Guardrails** - Contra prompt injection direta e indireta, com validação de saída
 
 ### Dados & Infraestrutura
-- **MongoDB Atlas (PyMongo Async)** - Eventos de risco com agregação `$facet` e índice TTL; base de conhecimento com Vector Search e auto-embedding (`voyage-4-lite`); Stable API v1
+- **MongoDB Atlas** - Base de conhecimento vetorial e eventos anônimos de golpe (agregação `$facet`)
+- **Render** - API e app no ar
 - **Docker** - Conteinerização e ambiente isolado
-- **GitHub Actions** - Integração contínua
 - **Pytest + Ruff** - Testes e linting
 
 ---
@@ -100,7 +66,7 @@ Mais detalhes em [`docs/architecture.md`](docs/architecture.md) e [`SECURITY.md`
 
 ### Pré-requisitos
 - Python (v3.11+)
-- Docker e Docker Compose (opcional)
+- Uma chave do Gemini e um cluster no MongoDB Atlas (opcionais: sem eles, a API roda com regras e memória local)
 
 ### Instalação e Execução
 
@@ -110,7 +76,7 @@ git clone https://github.com/evamyuu/caramelo-api.git
 cd caramelo-api
 ```
 
-2. **Crie o ambiente virtual e instale as dependências:**
+2. **Instale as dependências:**
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
@@ -120,45 +86,15 @@ playwright install chromium
 3. **Configure as variáveis de ambiente:**
 ```bash
 cp .env.example .env
-# Edite o .env para adicionar suas credenciais (Gemini, Anthropic, MongoDB Atlas, etc.)
+# Edite o .env para adicionar suas credenciais (Gemini, MongoDB Atlas, etc.)
 ```
 
-| Variável | Finalidade | Padrão |
-| --- | --- | --- |
-| `GEMINI_API_KEY` | LLM do plano gratuito | vazio (modo `rules`) |
-| `ANTHROPIC_API_KEY` | Tem prioridade sobre o Gemini | vazio |
-| `MONGODB_URI` | String de conexão do Atlas | vazio (em memória) |
-| `CORS_ORIGINS` | Origens web permitidas | `http://localhost:5173` |
-
-4. **Carregue a base de conhecimento no Atlas (opcional):**
-
-Crie antes o índice `knowledge_vector` (veja [`docs/architecture.md`](docs/architecture.md)). Sem ele, o assistente usa busca por palavras-chave na mesma base. O script lê `MONGODB_URI` do ambiente, não do `.env`:
-```bash
-MONGODB_URI="mongodb+srv://..." python -m scripts.seed_knowledge
-```
-
-5. **Suba a API:**
+4. **Suba a API:**
 ```bash
 uvicorn app.main:app --reload --env-file .env
 ```
 
-Ou com Docker (API + MongoDB local):
-```bash
-docker compose up --build
-```
-
-6. **Rode os testes e o lint:**
-```bash
-ruff check . && pytest
-```
-
----
-
-## 🧭 Próximos Passos
-
-- **Login Único gov.br** - Parceria com o governo para integrar o Caramelo como aplicação credenciada (OAuth do gov.br). A pessoa autoriza o acesso uma vez no app oficial, sem captcha nem automação de tela, e o modo guia fica só para os demais sites
-- **Open Finance e CAMARA** - Trocar os stubs de saldo e SIM Swap por integrações reais via agregador autorizado e operadoras
-- **App Android** - Analisar ligações recebidas em tempo real; o score de risco já está pronto na API
+A documentação interativa fica em `http://localhost:8000/docs`.
 
 ---
 
@@ -192,7 +128,7 @@ Agradecemos às seguintes pessoas que contribuíram para este projeto:
 Caramelo é um projeto acadêmico open source. A melhor forma de contribuir é abrindo issues com sugestões ou bugs encontrados.
 
 - **Issues**: Descreva o problema ou sugestão
-- **Pull Requests**: Fork → branch → PR com descrição clara, seguindo [Conventional Commits](https://www.conventionalcommits.org) e rodando `ruff check . && pytest` antes
+- **Pull Requests**: Fork → branch → PR com descrição clara
 
 ---
 
