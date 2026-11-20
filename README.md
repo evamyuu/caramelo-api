@@ -24,6 +24,7 @@ O **Caramelo** é um assistente que protege e ajuda pessoas idosas no Brasil. Es
 | --- | --- | --- |
 | Análise isolada de links (navegador headless descartável, score explicável) | Real | `POST /api/v1/links/scan` |
 | Navegação assistida com consentimento e entrega de CPF, senha, código e captcha para a pessoa, com modo guia como fallback | Real | `WS /api/v1/secure-session` |
+| Biometria facial ao vivo: quando o site pede a foto do rosto (prova de vida), o Caramelo pede licença, guia a pessoa na câmera dela e coloca a foto direto no campo do site, sem guardar nem mandar ao modelo | Real (Portal Cidadão de teste) | `WS /api/v1/secure-session` |
 | Score de risco de ligações (sinais ponderados e explicáveis) | Score real, ligação simulada | `POST /api/v1/calls/assess` |
 | Insights anônimos de golpes (agregação no MongoDB) | Real | `GET /api/v1/insights/summary` |
 | Mapa de golpes para parceiros: tendência, ranking por UF, sinais mais comuns e detecção de ondas (`$facet` no Atlas) | Real (com dados simulados marcados para demo) | `GET /api/v1/insights/dashboard` |
@@ -69,7 +70,7 @@ caramelo-api/
 ### Decisões de Design
 - **Aberto para extensão** - Um novo fornecedor de IA é uma classe em `ai/providers`; um novo armazenamento é um repositório
 - **A IA nunca decide a segurança** - Veredito, consentimento e credenciais são garantidos em código. O modelo só redige explicações e sugere passos de navegação, e o serviço funciona sem modelo nenhum (modo `rules`)
-- **Privacidade desde a concepção** - Eventos de risco não guardam telefone, URL nem id de usuário, e expiram por índice TTL. Senhas digitadas durante a entrega são repassadas à página e nunca registradas em log nem enviadas a um modelo
+- **Privacidade desde a concepção** - Eventos de risco não guardam telefone, URL nem id de usuário, e expiram por índice TTL. Senhas digitadas durante a entrega são repassadas à página e nunca registradas em log nem enviadas a um modelo. A foto do rosto vai da memória direto para o campo do site: não vira arquivo, log nem entrada de modelo (LGPD, art. 11)
 - **Guardrails na entrada e na saída** - Tudo o que vem de fora (o que a pessoa diz, o texto dos sites) vai para o modelo entre marcadores de dado e é checado contra injeção de instruções; uma tentativa nunca chega ao modelo, e uma página que tenta dar ordens vira suspeita (licença para tudo, nada digitado). Toda resposta é checada antes de chegar à tela e à voz: nada de pedir senha, código ou CPF, mandar fazer Pix, link fora do gov.br, telefone ou apelido ("vovó"); se quebrar uma regra, vale a resposta segura escrita em código
 - **Respeito às proteções dos sites** - Quando um site recusa navegadores automatizados (o gov.br rejeita captchas resolvidos neles), o Caramelo não disfarça o navegador: passa para o **modo guia**, abre o site oficial no navegador da própria pessoa e fala cada passo
 

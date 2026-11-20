@@ -109,3 +109,39 @@ async def test_page_that_gives_orders_is_treated_as_suspicious(base_url):
                 await ws.send(json.dumps({"type": "consent", "approved": False}))
     assert any("tentando me dar ordens" in speech for speech in speeches)
     assert consents == ["Posso tocar em “Ver detalhes”?"]  # a harmless label still needs consent here
+
+
+async def _proof_of_life(base_url: str, face_reply) -> tuple[dict, list[str], list[str]]:
+    """Log in, open "prova de vida" and answer the live face check with ``face_reply(last_frame)``."""
+    consents, gestures, last_frame = [], [], ""
+    async with websockets.connect(base_url.replace("http", "ws") + "/api/v1/secure-session", max_size=None) as ws:
+        await ws.send(json.dumps({"task": "fazer minha prova de vida", "url": f"{base_url}/demo/service/",
+                                  "scripted_plan": ["entrar", "prova de vida", "enviar"]}))
+        while (message := json.loads(await ws.recv()))["type"] != "done":
+            if message["type"] == "frame":
+                last_frame = message["image"]
+            elif message["type"] == "consent_request":
+                consents.append(message["question"])
+                await ws.send(json.dumps({"type": "consent", "approved": True}))
+            elif message["type"] == "handover":
+                for key in ({"text": "1234"}, {"special": "Enter"}):
+                    await ws.send(json.dumps({"type": "key", **key}))
+                await asyncio.sleep(1.5)
+                await ws.send(json.dumps({"type": "ready"}))
+            elif message["type"] == "biometric":
+                gestures = message["gestures"]
+                await ws.send(json.dumps({"type": "face", "image": face_reply(last_frame)}))
+    return message, consents, gestures
+
+
+async def test_site_asking_for_a_face_photo_gets_live_guidance(base_url):
+    """The portal's proof of life asks for a selfie: consent, live check on the device, photo into the site."""
+    message, consents, gestures = await _proof_of_life(base_url, lambda frame: frame)  # a JPEG stands in for the face
+    assert gestures == ["blink", "smile", "turn"]
+    assert any("foto do seu rosto" in question for question in consents)
+    assert message["success"] and "confirmada" in message["result"].lower()
+
+
+async def test_face_reply_that_is_not_a_photo_is_refused(base_url):
+    message, _, _ = await _proof_of_life(base_url, lambda frame: "bm90IGEgcGhvdG8=")
+    assert message["success"] is False

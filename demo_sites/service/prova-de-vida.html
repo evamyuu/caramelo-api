@@ -1,0 +1,29 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Prova de vida · Portal Cidadão (demonstração)</title><link rel="stylesheet" href="style.css"></head>
+<body><div class="demo-strip">Site fictício de demonstração do Caramelo</div>
+<header class="top"><svg class="top__logo" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 4 9v2h24V9z" fill="#f2a541"/><path d="M7 13h3v10H7zM14.5 13h3v10h-3zM22 13h3v10h-3zM4 25h24v3H4z" fill="#fff"/></svg><div class="top__name">Portal Cidadão<small>Prova de vida</small></div><span class="top__user">M</span></header>
+<main>
+  <h1>Prova de vida</h1>
+  <p class="lead">Confirme que é você com uma foto do rosto.</p>
+  <div class="card">
+    <ol class="steps" id="steps"><li>Luz de frente, sem boné ou óculos escuros</li><li>Pisque os olhos</li><li>Dê um sorriso</li><li>Vire o rosto devagar</li></ol>
+    <!-- Standard mobile selfie request: Caramelo recognises capture="user" and guides the person live. -->
+    <input id="face" type="file" accept="image/jpeg" capture="user" data-liveness="blink,smile,turn" hidden>
+    <label class="btn btn--primary" id="take" for="face">Tirar foto do rosto</label>
+    <img id="preview" class="preview" alt="Sua foto" hidden>
+    <button class="btn btn--primary" id="send" hidden>Enviar para verificação</button>
+  </div>
+</main>
+<script>
+  const face = document.getElementById("face");
+  face.addEventListener("change", () => {
+    const file = face.files[0];
+    if (!file) return;
+    const preview = document.getElementById("preview");
+    preview.src = URL.createObjectURL(file);
+    preview.hidden = false;
+    document.getElementById("steps").hidden = true;
+    document.getElementById("take").hidden = true;
+    document.getElementById("send").hidden = false;
+  });
+  document.getElementById("send").addEventListener("click", () => { location.href = "prova-de-vida-ok.html"; });
+</script></body></html>

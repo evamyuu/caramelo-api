@@ -8,17 +8,23 @@ delegated to the model:
 2. Credential handover: when a CPF, password, verification code or captcha
    appears, control is handed to the user. Keystrokes are forwarded to the page
    and are neither logged nor sent to the model.
-3. Banking domains are refused, at the start and at every step.
-4. The browser is destroyed when the session ends.
+3. Facial biometrics: when the site asks for a face photo (a ``capture`` file
+   input), Caramelo asks consent and then guides the person live on their own
+   camera. The photo goes straight into the site's field: it is never logged,
+   stored or sent to the model.
+4. Banking domains are refused, at the start and at every step.
+5. The browser is destroyed when the session ends.
 
 WebSocket protocol (JSON text frames)
 -------------------------------------
 Server to client: ``frame`` (JPEG, base64), ``speech``, ``step``,
 ``consent_request``, ``handover`` (with ``field``: ``identity``, ``password``,
-``code`` or ``captcha``), ``done``, and ``guide`` (``url``, ``steps``) when the
+``code`` or ``captcha``), ``biometric`` (``gestures`` the site asks for), ``done``,
+and ``guide`` (``url``, ``steps``) when the
 session falls back to guide mode (see ``app/services/guides.py``).
 Client to server: ``consent`` (``approved``), ``ready``, ``stop``, ``guide`` (the
-user prefers to do it in their own browser), and during a handover only, ``tap``
+user prefers to do it in their own browser), ``face`` (``image``: JPEG, base64)
+in answer to ``biometric``, and during a handover only, ``tap``
 (``x``, ``y``) and ``key`` (``text`` or ``special``).
 """
 
@@ -26,6 +32,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import binascii
 import contextlib
 import json
 import re
@@ -71,6 +78,21 @@ HANDOVER_SPEECH = {
     "code": "Agora é com você. Digite o código que chegou no seu celular e toque em Pronto.",
 }
 _HANDOVER_STEP = "user filled a private field on her own"
+# A site asking for a selfie: the standard mobile file input with ``capture``. Only one not yet answered.
+_FACE_REQUEST_JS = """() => {
+  const input = [...document.querySelectorAll('input[type=file][capture]')].find(el => !el.files.length);
+  if (!input) return null;
+  input.setAttribute('data-caramelo-face', '1');
+  return (input.dataset.liveness || '').split(',').map(g => g.trim()).filter(Boolean);
+}"""
+LIVENESS_GESTURES = ("blink", "smile", "turn")
+FACE_CONSENT = (
+    "O site pediu uma foto do seu rosto para confirmar que é você. Eu fico com você na câmera e te digo "
+    "cada passo. A foto vai só para o site, eu não guardo. Vamos?"
+)
+FACE_SPEECH = "Estou com você. Segure o celular na altura do rosto, com a luz de frente."
+MAX_FACE_BYTES = 1_500_000
+_JPEG_MAGIC = bytes((0xFF, 0xD8, 0xFF))
 BANK_REFUSAL = "No banco eu não entro por aqui. Eu preparo e abro o app do banco, e a senha é sempre sua."
 GUIDE_ON_REJECTION = (
     "O site do governo não deixou a sala segura entrar. Vamos fazer no seu celular: eu falo cada passo."
@@ -101,6 +123,17 @@ class _SwitchToGuide(Exception):
     def __init__(self, speech: str) -> None:
         super().__init__(speech)
         self.speech = speech
+
+
+def _jpeg(encoded: Any) -> bytes | None:
+    """The face photo sent by the device, if it is a JPEG of a sane size."""
+    if not isinstance(encoded, str) or len(encoded) > MAX_FACE_BYTES * 4 // 3 + 4:
+        return None
+    try:
+        data = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError):
+        return None
+    return data if data.startswith(_JPEG_MAGIC) else None
 
 
 def is_blocked(url: str) -> bool:
@@ -161,7 +194,7 @@ class SecureSession:
             while self._alive:
                 message = json.loads(await self._ws.receive_text())
                 kind = message.get("type")
-                if kind in ("consent", "ready", "guide"):
+                if kind in ("consent", "ready", "guide", "face"):
                     await self._replies.put(message)
                 elif kind == "stop":
                     self._alive = False
@@ -218,6 +251,24 @@ class SecureSession:
         if reply.get("type") == "guide":
             raise _SwitchToGuide(GUIDE_ON_REQUEST)
 
+    async def _face_check(self, requested: list[str]) -> bool:
+        """Guide the person live through the site's face check, then put the photo in the site's field."""
+        if not await self._request_consent(FACE_CONSENT):
+            return False
+        gestures = [g for g in requested if g in LIVENESS_GESTURES] or list(LIVENESS_GESTURES)
+        await self._send(type="biometric", gestures=gestures, speech=FACE_SPEECH)
+        reply = await self._replies.get()
+        if reply.get("type") == "guide":
+            raise _SwitchToGuide(GUIDE_ON_REQUEST)
+        photo = _jpeg(reply.get("image")) if reply.get("type") == "face" else None
+        if photo is None:
+            return False
+        # Straight into the page from memory: no file on disk, nothing logged, nothing sent to the model.
+        await self._page.locator("[data-caramelo-face]").first.set_input_files(
+            {"name": "rosto.jpg", "mimeType": "image/jpeg", "buffer": photo}
+        )
+        return True
+
     async def _next_action(self, elements: list[dict[str, Any]], page_text: str) -> dict[str, Any]:
         """Choose the next step: LLM when available, scripted plan otherwise."""
         if llm.provider() != "rules":
@@ -250,6 +301,15 @@ class SecureSession:
             page_text = await self._page.inner_text("body")
             if guides.automation_rejected(page_text):
                 raise _SwitchToGuide(GUIDE_ON_REJECTION)
+
+            face_request = await self._page.evaluate(_FACE_REQUEST_JS)
+            if face_request is not None:
+                if not await self._face_check(face_request):
+                    await self._send(type="done", success=False, result="Tudo bem, a foto fica para depois.")
+                    return
+                self._history.append("a pessoa fez a foto do rosto com o Caramelo e ela foi colocada no site")
+                await self._send(type="step", description="Foto do rosto feita com você")
+                continue
 
             field_kind = await self._pending_handover()
             if field_kind:
