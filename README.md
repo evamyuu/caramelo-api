@@ -16,7 +16,9 @@
 
 ## 🐾 Sobre o Projeto
 
-O **Caramelo** é uma interface agêntica que vira a tela do celular da pessoa idosa — um agente de IA que entende o que ela pede e **faz junto com ela**, cuidando do aparelho, da rotina e dos serviços do dia a dia, sempre com a pessoa no controle e protegendo contra golpes. Esta é a sua **API**, onde o Caramelo navega pelos serviços numa sala segura na nuvem, testa links suspeitos, responde com fonte e mapeia golpes. O app fica em [`caramelo-app`](https://github.com/evamyuu/caramelo-app).
+O **Caramelo** é uma interface agêntica que conecta a **pessoa idosa**, o **celular**, a **rotina** e os **serviços públicos** em uma única tela — um agente de IA que **faz junto com ela, do pedido por voz ao resultado** — devolvendo **autonomia**, **confiança** e **inclusão** para que milhões de idosos deixem de depender de alguém e se tornem, de verdade, cidadãos digitais.
+
+Este repositório é a **API**; o app fica em [`caramelo-app`](https://github.com/evamyuu/caramelo-app).
 
 ---
 
